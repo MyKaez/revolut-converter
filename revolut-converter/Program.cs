@@ -41,15 +41,15 @@ IEnumerable<CoinTracking> ConvertToCoinTracking(IEnumerable<Revolut> trades)
         switch (trade.Type)
         {
             case "EXCHANGE":
-                yield return new CoinTracking
-                {
-                    Typ = "Einzahlung",
-                    Börse = "Revolut",
-                    Gruppe = trade.Description,
-                    Datum = trade.CompletedDate.ToString("dd.MM.yyyy HH:mm:ss"),
-                    Kauf = trade.FiatAmount.ToString("F8", new CultureInfo("en-us")),
-                    CurTo = trade.BaseCurrency
-                };
+                // yield return new CoinTracking
+                // {
+                //     Typ = "Einzahlung",
+                //     Börse = "Revolut",
+                //     Gruppe = trade.Description,
+                //     Datum = trade.CompletedDate.ToString("dd.MM.yyyy HH:mm:ss"),
+                //     Kauf = trade.FiatAmount.ToString("F8", new CultureInfo("en-us")),
+                //     CurTo = trade.BaseCurrency
+                // };
                 yield return new CoinTracking
                 {
                     Typ = "Trade",
@@ -59,7 +59,8 @@ IEnumerable<CoinTracking> ConvertToCoinTracking(IEnumerable<Revolut> trades)
                     CurFrom = trade.BaseCurrency,
                     Verkauf = trade.FiatAmount.ToString("F8", new CultureInfo("en-us")),
                     CurTo = trade.Currency,
-                    Gruppe = trade.Description,
+                    //Gruppe = trade.Description,
+                    Gruppe = "Exchanged to BTC"
                 };
                 break;
             case "CRYPTO_WITHDRAWAL":
