@@ -19,72 +19,142 @@ public class StrikeExtractor : IExtractor
     private IEnumerable<CoinTracking> ConvertToCoinTracking(Strike[] trades)
     {
         foreach (var trade in trades)
+        {
+            var ct = CoinTracking(trade);
+
+            if (ct is null)
+                continue;
+
+            yield return ct;
+        }
+    }
+
+    private static CoinTracking? CoinTracking(Strike trade)
+    {
+        try
+        {
             switch (trade.TransactionType)
             {
                 case "Trade":
-                    var bitcoin = Convert.ToDecimal(trade.Amount2, new CultureInfo("en-us"));
-                    var euro = Convert.ToDecimal(trade.Amount1, new CultureInfo("en-us"));
-                    var coinTracking = new CoinTracking
-                    {
-                        Typ = "Trade",
-                        Börse = "Strike",
-                        Datum =
-                            DateTime.ParseExact(
-                                    string.IsNullOrEmpty(trade.CompletedDateUtc)
-                                        ? trade.InitiatedDateUtc
-                                        : trade.CompletedDateUtc, "MMM dd yyyy",
-                                    CultureInfo.InvariantCulture).Add(TimeSpan.Parse(
-                                    string.IsNullOrEmpty(trade.CompletedTimeUtc)
-                                        ? trade.InitiatedTimeUtc
-                                        : trade.CompletedTimeUtc))
-                                .ToString("dd.MM.yyyy HH:mm:ss"),
-                        Verkauf = euro
-                            .ToString("F8", new CultureInfo("en-us")),
-                        CurFrom = trade.Currency1,
-                        Gebühr = Convert.ToDecimal(trade.Fee1, new CultureInfo("en-us"))
-                            .ToString("F8", new CultureInfo("en-us")),
-                        Kommentar = trade.TransactionId,
-                        Gruppe = "Exchanged to BTC"
-                    };
-
-                    if (bitcoin > 0)
-                    {
-                        coinTracking.Kauf = bitcoin.ToString("F8", new CultureInfo("en-us"));
-                        coinTracking.CurTo = trade.Currency2;
-                        
-                        coinTracking.Verkauf = (-euro).ToString("F8", new CultureInfo("en-us"));
-                        coinTracking.CurFrom = trade.Currency1;
-                    }
-                    else
-                    {
-                        coinTracking.Kauf = euro.ToString("F8", new CultureInfo("en-us"));
-                        coinTracking.CurTo = trade.Currency1;
-                        
-                        coinTracking.Verkauf = (-bitcoin).ToString("F8", new CultureInfo("en-us"));
-                        coinTracking.CurFrom = trade.Currency2;
-                    }
-
-                    yield return coinTracking;
-                    break;
+                    return Trade(trade);
                 case "Withdrawal":
-                    var ct = new CoinTracking
-                    {
-                        Typ = "Auszahlung",
-                        Börse = "Strike",
-                        Kauf = Convert.ToDecimal(trade.Amount1, new CultureInfo("en-us"))
-                            .ToString("F8", new CultureInfo("en-us")),
-                        CurFrom = trade.Currency1,
-                        Datum = DateTime.ParseExact(trade.CompletedDateUtc, "MMM dd yyyy",
-                                CultureInfo.InvariantCulture).Add(TimeSpan.Parse(trade.CompletedTimeUtc))
-                            .ToString("dd.MM.yyyy HH:mm:ss"),
-                        Kommentar = trade.Description
-                    };
-                    Console.WriteLine($"Won't return {ct}");
+                    Withdrawl(trade);
                     break;
+                case "Lightning":
+                    return Lightning(trade);
                 default:
                     Console.WriteLine($"Won't handle type {trade.TransactionType}");
                     break;
             }
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"Error: {e.Message}");
+            Console.WriteLine(trade);
+        }
+
+        return null;
+    }
+
+    private static CoinTracking? Lightning(Strike trade)
+    {
+        if (string.IsNullOrWhiteSpace(trade.Amount2))
+            return null;
+        
+        var ct = new CoinTracking
+        {
+            Typ = "Auszahlung",
+            Börse = "Strike",
+            Verkauf = Convert.ToDecimal(trade.Amount2, new CultureInfo("en-us"))
+                .ToString("F8", new CultureInfo("en-us")),
+            CurTo = trade.Currency1,
+            Kommentar = trade.Description
+        };
+
+        if (!string.IsNullOrWhiteSpace(trade.CompletedDateUtc))
+        {
+            ct.Datum = DateTime.ParseExact(trade.CompletedDateUtc, "MMM dd yyyy",
+                    CultureInfo.InvariantCulture).Add(TimeSpan.Parse(trade.CompletedTimeUtc))
+                .ToString("dd.MM.yyyy HH:mm:ss");
+        }
+        else
+        {
+            ct.Datum = DateTime.ParseExact(trade.InitiatedDateUtc, "MMM dd yyyy",
+                    CultureInfo.InvariantCulture).Add(TimeSpan.Parse(trade.InitiatedTimeUtc))
+                .ToString("dd.MM.yyyy HH:mm:ss");
+        }
+
+        return ct;
+    }
+
+    private static void Withdrawl(Strike trade)
+    {
+        var ct = new CoinTracking
+        {
+            Typ = "Auszahlung",
+            Börse = "Strike",
+            Kauf = string.IsNullOrWhiteSpace(trade.Fee1)
+                ? 0.ToString("F8", new CultureInfo("en-us"))
+                : Convert.ToDecimal(trade.Amount1, new CultureInfo("en-us"))
+                    .ToString("F8", new CultureInfo("en-us")),
+            CurFrom = trade.Currency1,
+            Kommentar = trade.Description
+        };
+
+        ct.Datum = DateTime.ParseExact(trade.CompletedDateUtc, "MMM dd yyyy",
+                CultureInfo.InvariantCulture).Add(TimeSpan.Parse(trade.CompletedTimeUtc))
+            .ToString("dd.MM.yyyy HH:mm:ss");
+
+        Console.WriteLine($"Won't return {ct}");
+    }
+
+    private static CoinTracking? Trade(Strike trade)
+    {
+        var bitcoin = Convert.ToDecimal(trade.Amount2, new CultureInfo("en-us"));
+        var euro = Convert.ToDecimal(trade.Amount1, new CultureInfo("en-us"));
+        var coinTracking = new CoinTracking
+        {
+            Typ = "Trade",
+            Börse = "Strike",
+            Datum =
+                DateTime.ParseExact(
+                        string.IsNullOrEmpty(trade.CompletedDateUtc)
+                            ? trade.InitiatedDateUtc
+                            : trade.CompletedDateUtc, "MMM dd yyyy",
+                        CultureInfo.InvariantCulture).Add(TimeSpan.Parse(
+                        string.IsNullOrEmpty(trade.CompletedTimeUtc)
+                            ? trade.InitiatedTimeUtc
+                            : trade.CompletedTimeUtc))
+                    .ToString("dd.MM.yyyy HH:mm:ss"),
+            Verkauf = euro
+                .ToString("F8", new CultureInfo("en-us")),
+            CurFrom = trade.Currency1,
+            Gebühr = string.IsNullOrWhiteSpace(trade.Fee1)
+                ? 0.ToString("F8", new CultureInfo("en-us"))
+                : Convert.ToDecimal(trade.Fee1, new CultureInfo("en-us"))
+                    .ToString("F8", new CultureInfo("en-us")),
+            Kommentar = trade.TransactionId,
+            Gruppe = "Exchanged to BTC"
+        };
+
+        if (bitcoin > 0)
+        {
+            coinTracking.Kauf = bitcoin.ToString("F8", new CultureInfo("en-us"));
+            coinTracking.CurTo = trade.Currency2;
+
+            coinTracking.Verkauf = (-euro).ToString("F8", new CultureInfo("en-us"));
+            coinTracking.CurFrom = trade.Currency1;
+        }
+        else
+        {
+            coinTracking.Kauf = euro.ToString("F8", new CultureInfo("en-us"));
+            coinTracking.CurTo = trade.Currency1;
+
+            coinTracking.Verkauf = (-bitcoin).ToString("F8", new CultureInfo("en-us"));
+            coinTracking.CurFrom = trade.Currency2;
+        }
+
+        return coinTracking;
     }
 
     private record Strike
