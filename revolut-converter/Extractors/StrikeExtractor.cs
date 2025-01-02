@@ -63,7 +63,7 @@ public class StrikeExtractor : IExtractor
         
         var ct = new CoinTracking
         {
-            Typ = "Auszahlung",
+            Typ = "Ausgabe",
             Börse = "Strike",
             Verkauf = Convert.ToDecimal(trade.Amount2, new CultureInfo("en-us"))
                 .ToString("F8", new CultureInfo("en-us")),
